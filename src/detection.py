@@ -5,20 +5,6 @@ import numpy as np
 # The functions are based on color detection and contour detection
 # The functions are not perfect and may not work in all cases
 
-def detect_pieces(img):
-    # resize 
-    img = cv2.resize(img, (640, 480))
-    # crop: extra pixels outside the chessboard are unnecessary
-    img = img[10:-10, 5:-20]
-    # detect black and white pieces
-    # the contours of the detected pieces are returned
-    black_contours = detect_black_pieces(img)
-    white_contours = detect_white_pieces(img)
-    # draw bounding boxes around detected pieces
-    img = draw_black_bounding_boxes(img, black_contours)
-    img = draw_white_bounding_boxes(img, white_contours)
-    return img    
-
 
 # The following function is used to detect black pieces
 # The lower and upper values for the threshold were found by trial and error
@@ -101,11 +87,20 @@ def draw_white_bounding_boxes(img, white_contours, padding_width = 0.25, padding
         cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
     return img
 
-def crop_pieces(img, contours, extra_width=5, extra_height=10):
+def crop_pieces(img, contours, color):
     pieces = []
+    if color == 'black':
+        padding_width = 0.25
+        padding_height = 0.2
+    else:
+        padding_width = 0.25
+        padding_height = 0.4
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
-        
+        # calculate extra width and height based on padding
+        extra_width = int(padding_width * w)
+        extra_height = int(padding_height * h)
+        # add extra width and height to the bounding box
         x -= extra_width
         y -= extra_height
         w += extra_width
