@@ -11,58 +11,19 @@ def detect_pieces(img):
     # crop: extra pixels outside the chessboard are unnecessary
     img = img[10:-10, 5:-20]
     # detect black and white pieces
-    # black pieces are detected using grayscale thresholding
-    # white pieces are detected using HSV color space
     # the contours of the detected pieces are returned
     black_contours = detect_black_pieces(img)
     white_contours = detect_white_pieces(img)
     # draw bounding boxes around detected pieces
     img = draw_black_bounding_boxes(img, black_contours)
     img = draw_white_bounding_boxes(img, white_contours)
-    return img
-    
+    return img    
 
-
-
-# for the following two functions,
-# some extra pixels are added to the bounding box
-# to make sure the piece is not cropped
-
-def draw_black_bounding_boxes(img, black_contours, extra_width=4, extra_height=4):
-    for c in black_contours:
-        x, y, w, h = cv2.boundingRect(c)
-        x -= extra_width
-        y -= extra_height
-        w += extra_width
-        h += extra_height
-        cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
-    return img
-
-def draw_white_bounding_boxes(img, white_contours, extra_width=8, extra_height=12):
-    for c in white_contours:
-        x, y, w, h = cv2.boundingRect(c)
-        x -= extra_width
-        y -= 2*extra_height # some (extra) extra pixels are added to the height
-        w += 2*extra_width
-        h += 2*extra_height
-        cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
-    return img
-
-def crop_pieces(img, contours, extra_width=5, extra_height=10):
-    pieces = []
-    for c in contours:
-        x, y, w, h = cv2.boundingRect(c)
-        x -= extra_width
-        y -= extra_height
-        w += extra_width
-        h += extra_height
-        pieces.append(img[y:y+h, x:x+w+5]) # add 5 pixels to the width
-    return pieces
 
 # The following function is used to detect black pieces
 # The lower and upper values for the threshold were found by trial and error
 # They are not perfect and may not work in all cases
-def detect_black_pieces(img, threshold=60, min_area=150, max_area=2500):
+def detect_black_pieces(img, threshold=55, min_area=150, max_area=2500):
     # convert to grayscale
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # median blur
@@ -107,6 +68,50 @@ def detect_white_pieces(img, h_bounds = (23, 36),v_bounds = (64, 191), min_area=
                 if max_area > cv2.contourArea(c) > min_area
                 and cv2.boundingRect(c)[2] <= cv2.boundingRect(c)[3] <= 2.5 * cv2.boundingRect(c)[2]]
     return contours
+
+# For the following functions,
+# some extra pixels are added to the bounding box
+# to make sure the piece is not cropped
+
+def draw_black_bounding_boxes(img, black_contours, padding_width=0.25, padding_height=0.2):
+    # draw bounding boxes around detected pieces
+    for c in black_contours:
+        x, y, w, h = cv2.boundingRect(c)
+         # calculate extra width and height based on padding
+        extra_width = int(padding_width * w)
+        extra_height = int(padding_height * h)
+        x -= extra_width
+        y -= extra_height
+        w += extra_width
+        h += extra_height
+        cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+    return img
+
+def draw_white_bounding_boxes(img, white_contours, padding_width = 0.25, padding_height = 0.4):
+    # draw bounding boxes around detected pieces
+    for c in white_contours:
+        x, y, w, h = cv2.boundingRect(c)
+        # calculate extra width and height based on padding
+        extra_width = int(padding_width * w)
+        extra_height = int(padding_height * h)
+        x -= extra_width
+        y -= extra_height 
+        w += 2*extra_width
+        h += extra_height
+        cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
+    return img
+
+def crop_pieces(img, contours, extra_width=5, extra_height=10):
+    pieces = []
+    for c in contours:
+        x, y, w, h = cv2.boundingRect(c)
+        
+        x -= extra_width
+        y -= extra_height
+        w += extra_width
+        h += extra_height
+        pieces.append(img[y:y+h, x:x+w+5]) # add 5 pixels to the width
+    return pieces
 
 
 
