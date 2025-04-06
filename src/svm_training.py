@@ -2,21 +2,21 @@ import os
 import cv2
 import numpy as np
 from sklearn.svm import SVC
-from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.model_selection import train_test_split
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.model_selection import StratifiedKFold
 from skimage.feature import hog
 from joblib import dump
 
 DATA_DIR = "data/detected"
-IMAGE_SIZE = (32, 64)  # Adjusted for 2:1 height-to-width ratio  # Standardized size for all pieces
+IMAGE_SIZE = (32, 64)  # Adjusted for 2:1 height-to-width ratio
 
 def extract_features(image):
-    # Resize image
     image = cv2.resize(image, IMAGE_SIZE)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     # 1. HOG features
-    hog_features = hog(gray, pixels_per_cell=(8, 8), cells_per_block=(2, 2), 
+    hog_features = hog(gray, pixels_per_cell=(8, 8), cells_per_block=(2, 2),
                        block_norm='L2-Hys', visualize=False, feature_vector=True)
 
     # 2. Hu Moments
@@ -24,7 +24,6 @@ def extract_features(image):
     hu_moments = cv2.HuMoments(moments).flatten()
     hu_moments = -np.sign(hu_moments) * np.log10(np.abs(hu_moments) + 1e-10)  # log scale
 
-    # Combine all features into one vector
     return np.hstack((hog_features, hu_moments))
 
 def load_data():
@@ -49,7 +48,13 @@ def load_data():
                     y.append(f"{color}_{label}")
     return np.array(X), np.array(y)
 
+import argparse
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--save", action="store_true", help="Save the best model and transformer")
+    args = parser.parse_args()
+
     print("Loading data and extracting features...")
     X, y = load_data()
     print(f"Dataset size: {len(X)} samples")
@@ -57,20 +62,48 @@ def main():
         print("No data found. Please check your dataset path and labels.")
         return
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    k = 5
+    skf = StratifiedKFold(n_splits=k, shuffle=True)
+    accuracies = []
+    best_acc = -1
+    best_model = None
+    best_lda = None
 
-    print("Training SVM classifier...")
-    clf = SVC(kernel='linear', probability=True)
-    clf.fit(X_train, y_train)
+    for fold, (train_idx, test_idx) in enumerate(skf.split(X, y), 1):
+        print(f"\nFold {fold}/{k}")
+        X_train, X_test = X[train_idx], X[test_idx]
+        y_train, y_test = y[train_idx], y[test_idx]
 
-    print("Evaluating...")
-    y_pred = clf.predict(X_test)
-    print(classification_report(y_test, y_pred))
-    print("Confusion Matrix:")
-    print(confusion_matrix(y_test, y_pred))
+        lda = LDA()
+        X_train_lda = lda.fit_transform(X_train, y_train)
+        X_test_lda = lda.transform(X_test)
+        print(f"LDA reduced to {X_train_lda.shape[1]} features")
 
-    dump(clf, "svm_chess_classifier.joblib")
-    print("Model saved as 'svm_chess_classifier.joblib'")
+        clf = SVC(kernel='linear', probability=True)
+        clf.fit(X_train_lda, y_train)
+
+        y_pred = clf.predict(X_test_lda)
+        acc = accuracy_score(y_test, y_pred)
+        accuracies.append(acc)
+
+        if acc > best_acc:
+            best_acc = acc
+            best_model = clf
+            best_lda = lda
+
+        print(f"Accuracy: {acc:.4f}")
+        print("Classification Report:")
+        print(classification_report(y_test, y_pred))
+        print("Confusion Matrix:")
+        print(confusion_matrix(y_test, y_pred))
+
+    print(f"\nAverage Accuracy over {k} folds: {np.mean(accuracies):.4f}")
+
+    if args.save and best_model is not None:
+            dump(best_model, "SVC_LDA.joblib")
+            dump(best_lda, "lda_transformer.joblib")
+            print(f"Model saved as 'SVC_LDA.joblib' with accuracy: {best_acc:.4f}")
+            print("LDA transformer saved as 'lda_transformer.joblib'")
 
 if __name__ == "__main__":
     main()
