@@ -1,4 +1,7 @@
-data/
+data/raw
+data/test
+data/train
+data/valid
 
 venv/
 
