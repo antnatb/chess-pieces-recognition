@@ -2,6 +2,8 @@ data/raw
 data/test
 data/train
 data/valid
+data/README.dataset.txt
+data/README.roboflow.txt
 
 venv/
 
